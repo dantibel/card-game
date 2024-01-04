@@ -1,6 +1,6 @@
 pub const CARDS_IN_DECK_COUNT: usize = 6;
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Value
 {
     Two = 2,
@@ -68,12 +68,12 @@ impl std::fmt::Display for Value
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Suit
 {
     Club,
-    Spade,
     Heart,
+    Spade,
     Diamond,
 }
 
@@ -115,12 +115,12 @@ impl std::fmt::Display for Suit
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, PartialOrd)]
 pub struct Card
 {
     value : Value,
     suit  : Suit,
-}
+}   
 
 impl Card
 {
@@ -138,11 +138,6 @@ impl Card
     {
         self.suit
     }
-
-    pub fn signature(& self) -> String
-    {
-        format!("│{}{} │", self.value, self.suit)
-    }
 }
 
 impl std::fmt::Display for Card
@@ -156,6 +151,17 @@ impl std::fmt::Display for Card
 └────┘\n", self.value, self.suit)
         */
         write!(f, "{}{}", self.value, self.suit)
+    }
+}
+
+impl Ord for Card
+{
+    fn cmp(& self, other: & Self) -> std::cmp::Ordering
+    {
+        let res = self.suit.cmp(& other.suit);
+        if res.is_ne() { return res; }
+
+        self.value.cmp(& other.value)
     }
 }
 
@@ -178,7 +184,7 @@ pub fn output_cards(cards: & Vec<Card>)
 
     for card in cards
     {
-        print!("|{card} |");
+        print!("│{card} │");
     }
     println!();
 
@@ -198,6 +204,6 @@ pub fn output_cards(cards: & Vec<Card>)
     {
         print!("  {:>2}  ", i);
     }
-    println!();
+    println!("\n");
 
 }

@@ -1,7 +1,7 @@
 use rand::Rng;
 
 use crate::table::Table;
-use crate::utils::{Error, log};
+use crate::utils::{Error, log, logln};
 use crate::{cards, player};
 use crate::player::Player;
 
@@ -104,7 +104,7 @@ impl Game
         }
         else
         {
-            log!(0, "{} has joined the game", (player.name()));
+            logln!(0, "{} joined the game\n", (player.name()));
             self.players.push(player);
             Ok(())
         }
@@ -114,20 +114,29 @@ impl Game
     {
         if self.players_count() < 2
         {
-            log!(0, "There are not enough players in this game to start (need {} more)", (2 - self.players_count()));
+            logln!(0, "There are not enough players in this game to start (need {} more)\n", (2 - self.players_count()));
             return;
         }
 
+        logln!(0, "Current settings: {} cards, {}, {}\n",
+            (self.settings.card_deck as usize),
+            (if self.settings.cheats_allowed {"cheats are allowed"} else {"cheats are forbiden"}),
+            (if self.settings.finish_after_first_win {"playnig until first win"} else {"playing until one player remain"}));
+        logln!(0, "Shufling deck...\n");
         self.table.reset();
-
-        // serve all players with start cards
+        
+        logln!(0, "Serving cards...\n");
         for player in self.players.iter_mut()
         {
             player.take_cards(&mut self.table.draw_stock_cards(cards::CARDS_IN_DECK_COUNT).unwrap());
             player.show_cards();
         }
 
-        self.attacking_player_index = rand::thread_rng().gen_range(0..self.players_count());
+        logln!(0, "Choosing starting player...\n");
+        //self.attacking_player_index = rand::thread_rng().gen_range(0..self.players_count());
+        self.attacking_player_index = 1; 
+
+        logln!(0, "Game have started! ══════════════════════\n");
 
         // play until end
         if self.settings.finish_after_first_win
@@ -153,20 +162,26 @@ impl Game
         {
             Some(card) =>
             {
+                if is_first_attack
+                {
+                    logln!(0, "{} started attack with the {card}\n", (player.name()));
+                    self.table.take_attack_card(card);
+                    return true;
+                }
                 match self.table.check_attack_card(& card)
                 {
                     Ok(_) =>
                     {
-                        log!(0, "{} has attacked with the {card}", (player.name()));
+                        logln!(0, "{} continue attack with the {card}\n", (player.name()));
                         self.table.take_attack_card(card);
-                        true
+                        return true;
                     },
                     Err(error) => panic!("{error}"),
                 }
             },
             None =>
             {
-                log!(0, "{} has passed", (player.name()));
+                logln!(0, "{} passed\n", (player.name()));
                 false
             }
         }
@@ -179,7 +194,7 @@ impl Game
         {
             Some((attack_card_index, defense_card)) =>
             {
-                log!(0, "{} has beat the {} with the {}", (player.name()), (self.table.attack_cards()[attack_card_index]), (defense_card));
+                logln!(0, "{} beat the {} with the {}\n", (player.name()), (self.table.attack_cards()[attack_card_index]), (defense_card));
                 match self.table.check_defense_card(& defense_card, attack_card_index)
                 {
                     Ok(_) => 
@@ -192,7 +207,7 @@ impl Game
             },
             None => 
             {
-                log!(0, "{} is taking the cards", (player.name()));
+                logln!(0, "{} is taking the cards\n", (player.name()));
                 false
             }
         }
@@ -200,7 +215,9 @@ impl Game
 
     fn play_round(&mut self)
     {
-        let defenseing_player_index = (self.attacking_player_index + 1) % self.players_count();
+        logln!(0, "New round started! ──────────────────────\n");
+        logln!(0, "{}", (self.table));
+        let defendeing_player_index = (self.attacking_player_index + 1) % self.players_count();
 
         // attacking player starts the attack
         assert_eq!(self.process_player_attack(self.attacking_player_index, true), true);
@@ -210,10 +227,14 @@ impl Game
         let mut is_defense = true;
         loop
         {
+            logln!(0, "{}", (self.table));
+        
             if is_defense
-            { 
-                if !self.process_player_defense(defenseing_player_index)
+            {
+                if !self.process_player_defense(defendeing_player_index)
                 {
+                    logln!(0, "{}", (self.table));
+        
                     defense_succeed = false;
                     break;
                 }
@@ -222,49 +243,58 @@ impl Game
             {
                 if !self.process_player_attack(self.attacking_player_index, false)
                 {
+                    logln!(0, "{}", (self.table));
+        
                     break;
                 }
             }
             is_defense = !is_defense;
         }
         
-        // other players continue the round
-        let mut round_is_going = true;
-        let mut player_index = defenseing_player_index;
-        while round_is_going
+        if self.players_count() > 2
         {
-            round_is_going = false;
-            player_index = (player_index + 1) % self.players_count();
-
-            if player_index != defenseing_player_index
+            // other players continue the round
+            let mut round_is_going = true;
+            let mut player_index = defendeing_player_index;
+            while round_is_going
             {
-                if self.process_player_attack(player_index, false)
+                round_is_going = false;
+                player_index = (player_index + 1) % self.players_count();
+                
+                if player_index != defendeing_player_index
                 {
-                    round_is_going = true;
+                    if self.process_player_attack(player_index, false)
+                    {
+                        round_is_going = true;
+                    }
                 }
-            }
-            else
-            {
-                if !self.process_player_defense(player_index)
+                else
                 {
-                    defense_succeed = false;
+                    if !self.process_player_defense(player_index)
+                    {
+                        defense_succeed = false;
+                    }
                 }
             }
         }
-
+        
         // attacking player draw cards
         let mut player = self.players[self.attacking_player_index].as_mut();
         if let Some(mut cards) = self.table.draw_stock_cards(cards::CARDS_IN_DECK_COUNT - player.cards_count())
         {
             player.take_cards(&mut cards);
         }
+
+        logln!(0, "{}", (self.table));
+        
+        if self.players_count() > 2
         {
             // other players draw cards
             let mut next_index: usize;
             let mut player: &mut dyn Player;
             for i in 1 ..= self.players_count()
             {
-                next_index = (defenseing_player_index + i) % self.players_count();
+                next_index = (defendeing_player_index + i) % self.players_count();
                 player = self.players[next_index].as_mut();
                 match self.table.draw_stock_cards(cards::CARDS_IN_DECK_COUNT - player.cards_count())
                 {
@@ -275,7 +305,7 @@ impl Game
         }
 
         // defending player draws cards
-        let defending_player = self.players[defenseing_player_index].as_mut();
+        let defending_player = self.players[defendeing_player_index].as_mut();
         if defense_succeed
         {
             self.table.discard_cards();
@@ -290,7 +320,7 @@ impl Game
         }
 
         // choose next player
-        self.attacking_player_index = defenseing_player_index;
+        self.attacking_player_index = defendeing_player_index;
     }
 
 }

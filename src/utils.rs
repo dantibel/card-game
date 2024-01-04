@@ -35,28 +35,59 @@ impl std::error::Error for Error
 
 const INDENT_SIZE: usize = 3;
 
-macro_rules! log {
-    ($indent:literal, $format:literal) => {
-        println!("{: >1$}", $format, $indent)
-    };
-    ($indent:literal, $format:literal, $($arg:tt), +) => {
-        println!("{: >1$}", format!($format, $($arg), +), $indent)
-    };
-    ($indent:ident, $format:ident) => {
-        println!("{: >1$}", $format, $indent)
-    };
-    ($indent:ident, $format:ident, $($arg:tt), +) => {
-        println!("{: >1$}", format!($format, $($arg), +), $indent)
-    };
-
-}
-
-pub fn log1(message: & str, indent_level: usize)
+macro_rules! log
 {
-    println!("{: >1$}", message, indent_level * INDENT_SIZE);
+    ($indent:literal, $format:literal) =>
+    {
+        print!("{: >1$}", $format, $indent)
+    };
+
+    ($indent:literal, $format:literal, $($arg:tt), +) =>
+    {
+        print!("{: >1$}", format!($format, $($arg), +), $indent)
+    };
+
+    ($indent:ident, $format:ident) =>
+    {
+        print!("{: >1$}", $format, $indent)
+    };
+
+    ($indent:ident, $format:ident, $($arg:tt), +) =>
+    {
+        print!("{: >1$}", format!($format, $($arg), +), $indent)
+    };
 }
 
-pub(crate) use log; 
+macro_rules! logln
+{
+    () =>
+    {
+      println!()  
+    };
+
+    ($indent:literal, $format:literal) =>
+    {
+        println!("{: >1$}", $format, $indent)
+    };
+
+    ($indent:literal, $format:literal, $($arg:tt), +) =>
+    {
+        println!("{: >1$}", format!($format, $($arg), +), $indent)
+    };
+
+    ($indent:ident, $format:ident) =>
+    {
+        println!("{: >1$}", $format, $indent)
+    };
+
+    ($indent:ident, $format:ident, $($arg:tt), +) =>
+    {
+        println!("{: >1$}", format!($format, $($arg), +), $indent)
+    };
+
+}
+
+pub(crate) use {log, logln}; 
 
 pub enum Input
 {

@@ -7,7 +7,7 @@ use crate::utils::Error;
 pub struct Table
 {
     attack_cards    : Vec<cards::Card>,
-    defense_cards    : Vec<cards::Card>,
+    defense_cards   : Vec<cards::Card>,
     discarded_cards : Vec<cards::Card>,
     card_stock      : Vec<cards::Card>,
     trump           : cards::Suit,
@@ -21,7 +21,7 @@ impl Table
         Self
         {
             attack_cards    : Vec::with_capacity(6),
-            defense_cards    : Vec::with_capacity(6),
+            defense_cards   : Vec::with_capacity(6),
             discarded_cards : Vec::with_capacity(card_deck),
             card_stock      : Vec::with_capacity(card_deck),
             trump           : cards::Suit::Spade,
@@ -62,6 +62,16 @@ impl Table
         & self.defense_cards
     }
 
+    pub fn remain_cards_count(& self) -> usize
+    {
+        self.card_stock.len()
+    }
+
+    pub fn trump(& self) -> cards::Suit
+    {
+        self.trump
+    }
+
     // --- consume player cards ---
 
     pub fn check_attack_card(& self, attack_card: & cards::Card) -> Result<(), Error>
@@ -91,8 +101,9 @@ impl Table
         self.attack_cards.len() == self.defense_cards.len()
     }
 
-    pub fn can_beat(& self, defense_card: & cards::Card, attack_card: & cards::Card) -> bool
+    pub fn can_beat(& self, defense_card: & cards::Card, attack_card_index: usize) -> bool
     {
+        let attack_card = & self.attack_cards[attack_card_index];
         if defense_card.suit() != self.trump
         {
             defense_card.suit() == attack_card.suit() &&
@@ -108,7 +119,7 @@ impl Table
         }
     }
 
-    pub fn check_defense_card(&mut self, defense_card: & cards::Card, attack_card_index: usize) -> Result<(), Error>
+    pub fn check_defense_card(& self, defense_card: & cards::Card, attack_card_index: usize) -> Result<(), Error>
     {
         if self.is_attack_beaten()
         {
@@ -118,7 +129,7 @@ impl Table
         {
             Err(Error::InvalidAttackIndex(attack_card_index))
         }
-        else if !self.can_beat(& defense_card, & self.attack_cards[attack_card_index])
+        else if !self.can_beat(& defense_card, attack_card_index)
         {
             Err(Error::IncorrectDefense)
         }
@@ -174,5 +185,71 @@ impl Table
         {
             None
         }
+    }
+}
+
+impl std::fmt::Display for Table 
+{
+    fn fmt(& self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error>
+    {
+        writeln!(f, "Cards remain: {}, trump: {}", self.remain_cards_count(), self.trump())?;
+        for _ in 0 .. self.attack_cards.len()
+        {
+            write!(f, "┌────┐")?;
+        }
+        writeln!(f);
+
+        for card in self.attack_cards.iter()
+        {
+            write!(f, "│{card} │")?;
+        }
+        writeln!(f);
+
+        if self.attack_cards.len() > self.defense_cards.len()
+        {
+            for _ in 0 .. self.attack_cards.len()
+            {
+                write!(f, "│    │")?;
+            }
+            writeln!(f); 
+
+            for _ in 0 .. self.attack_cards.len()
+            {
+                write!(f, "└────┘")?;
+            }
+            writeln!(f); 
+        }
+        else
+        {
+            for _ in 0 .. self.defense_cards.len()
+            {
+                write!(f, "│┌───┴┐")?;
+            }
+            writeln!(f); 
+            
+            for card in self.defense_cards.iter()
+            {
+                write!(f, "└┤{card} │")?;
+            }
+            writeln!(f);
+
+            for _ in 0 .. self.defense_cards.len()
+            {
+                write!(f, " │    │")?;
+            }
+            writeln!(f);
+            
+            for _ in 0 .. self.defense_cards.len()
+            {
+                write!(f, " └────┘")?;
+            }
+            writeln!(f);
+        }
+
+        for i in 0..cards::CARDS_IN_DECK_COUNT
+        {
+            write!(f, "  {:>2}  ", i);
+        }
+        writeln!(f, "\n")
     }
 }

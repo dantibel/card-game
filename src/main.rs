@@ -1,4 +1,5 @@
 #![allow(unused)]
+#![windows_subsystem = "console"]
 
 mod utils;
 mod cards;
@@ -63,13 +64,20 @@ mod tests {
 fn main() {
     let mut game = game::Game::new(game::SettingsBuilder::new().build());
 
-    let bot = Box::new(player::Bot::new(player::BotDificulty::Hard));
-    let _ = game.add_player(bot);
+    let bot1 = Box::new(player::Bot::new(player::BotDificulty::Hard));
+    bot1.show_cards();
+    let _ = game.add_player(bot1);
 
-    let player = Box::new(player::RealPlayer::new("FOO"));
-    let _ = game.add_player(player);
+    let bot2 = Box::new(player::Bot::new(player::BotDificulty::Hard));
+    bot2.show_cards();
+    let _ = game.add_player(bot2);
+
+
+    let mut player = Box::new(player::RealPlayer::new("FOO"));
+    //let mut cards = vec![Card::new(Value::Seven, Suit::Heart), Card::new(Value::Seven, Suit::Spade), Card::new(Value::Seven, Suit::Diamond), Card::new(Value::Seven, Suit::Club)];
+    //output_cards(&cards);
+    
+    //let _ = game.add_player(player);
 
     game.start();
-    // let mut cards = vec![Card::new(Value::Seven, Suit::Heart), Card::new(Value::Seven, Suit::Spade), Card::new(Value::Seven, Suit::Diamond), Card::new(Value::Seven, Suit::Club)];
-    // output_cards(& cards);
 }

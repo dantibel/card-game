@@ -1,6 +1,7 @@
 use std::path::PrefixComponent;
+use rand::Rng;
 
-use crate::utils::{Error, get_input, Input, log};
+use crate::utils::{Error, get_input, Input, log, logln};
 use crate::cards;
 use crate::table;
 
@@ -22,11 +23,13 @@ pub trait Player
     fn take_cards(&mut self, cards: &mut dyn Iterator<Item = cards::Card>)
     {
         self.cards_mut().extend(cards);
+        // self.cards_mut().sort_by(|lhs, rhs| -> std::cmp::Ordering lhs.value().cmp(rhs.value())});
+        self.cards_mut().sort();
     }
 
     fn show_cards(& self)
     {
-        println!("{}'s cards:", self.name());
+        logln!(1, "{}'s cards:", (self.name()));
         cards::output_cards(& self.cards());
     }
 
@@ -89,10 +92,11 @@ impl Player for RealPlayer
 
     fn play_attack_card(&mut self, table: & table::Table, is_first_attack: bool) -> Option<cards::Card>
     {
+        self.show_cards();
         let card_index =
             loop
             {
-                match get_input(1, if is_first_attack {"Choose the attack card"} else {"Choose the attack card (or type 'pass'):"})
+                match get_input(1, if is_first_attack {"Choose the attack card: "} else {"Choose the attack card (or type 'pass'): "})
                 {
                     Input::String(string) => 
                         if !is_first_attack && string == "pass"
@@ -101,20 +105,21 @@ impl Player for RealPlayer
                         }
                         else
                         {
-                            log!(2, "Inrecognized string answer");
+                            logln!(2, "Inrecognized string answer");
                         },
-                    Input::Number(number) =>
-                        if number < self.cards().len()
+                    Input::Number(index) =>
+                        if index < self.cards_count()
                         {
-                            break number;
+                            break index;
                         }
                         else
                         {
-                            log!(2, "You have only {} cards", (self.cards().len()));
+                            logln!(2, "You have only {} cards", (self.cards_count()));
                         },
                 }
             };
     
+        logln!();
         Some(self.cards.remove(card_index))
     }
     
@@ -132,53 +137,53 @@ impl Player for RealPlayer
                         }
                         else
                         {
-                            log!(2, "Inrecognized string answer");
+                            logln!(2, "Inrecognized string answer");
                         },
-                    Input::Number(number) =>
-                        if number < self.cards().len()
+                    Input::Number(index) =>
+                        if index < self.cards_count()
                         {
-                            break number;
+                            break index;
                         }
                         else
                         {
-                            log!(2, "You have only {} cards", (self.cards().len()));
+                            logln!(2, "You have only {} cards", (self.cards_count()));
                         },
                 }
             };
 
         loop
+        {
+            match get_input(1, "Choose card to beat (or type 'take'): ")
             {
-                match get_input(1, "Choose card to beat (or type 'take'): ")
-                {
-                    Input::String(string) => 
-                        if string == "take"
+                Input::String(string) => 
+                    if string == "take"
+                    {
+                        return None;
+                    }
+                    else
+                    {
+                        logln!(2, "Inrecognized string answer");
+                    },
+                Input::Number(index) =>
+                    if index < table.attack_cards().len()
+                    {
+                        let defense_card = & self.cards[defense_card_index];
+                        let attack_card = & table.attack_cards()[index];
+                        if table.can_beat(defense_card, index)
                         {
-                            return None;
+                            return Some((index, self.cards.remove(defense_card_index)));
                         }
                         else
                         {
-                            log!(2, "Inrecognized string answer");
-                        },
-                    Input::Number(number) =>
-                        if number < table.attack_cards().len()
-                        {
-                            let defense_card = & self.cards[defense_card_index];
-                            let attack_card = & table.attack_cards()[number];
-                            if table.can_beat(defense_card, attack_card)
-                            {
-                                return Some((number, self.cards.remove(defense_card_index)));
-                            }
-                            else
-                            {
-                                log!(2, "You can't beat {defense_card} with {attack_card}");    
-                            }
+                            logln!(2, "You can't beat {defense_card} with {attack_card}");    
                         }
-                        else
-                        {
-                            log!(2, "There are only {} attack cards on the table", (table.attack_cards().len()));
-                        },
-                }
-            };
+                    }
+                    else
+                    {
+                        logln!(2, "There are only {} attack cards on the table", (table.attack_cards().len()));
+                    },
+            }
+        };
     }
 }
 
@@ -194,7 +199,8 @@ impl std::fmt::Display for BotDificulty
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error>
     {
-        write!(f, "{}", match self
+        write!(f, "{}", 
+            match self
             {
                 Self::Easy => "Easy",
                 Self::Medium => "Medium",
@@ -247,11 +253,46 @@ impl Player for Bot
 
     fn play_attack_card(&mut self, table: & table::Table, is_first_attack: bool) -> Option<cards::Card>
     {
+        if is_first_attack
+        {
+            self.cards.remove(rand::thread_rng().gen_range(0 .. self.cards.len()));
+        }
         None
     }
     
     fn play_defense_card(&mut self, table: & table::Table) -> Option<(usize, cards::Card)>
     {
-        None
+        let mut non_trump_index: Option<usize> = None;
+        let mut trump_index: Option<usize> = None;
+        
+        let attack_card_index = table.defense_cards().len();
+        for defense_card_index in (0 .. self.cards.len()).rev()
+        {
+            match table.check_defense_card(& self.cards[defense_card_index], attack_card_index)
+            {
+                Ok(()) =>
+                    if self.cards[defense_card_index].suit() == table.trump()
+                    {
+                        trump_index = Some(defense_card_index);
+                    }
+                    else
+                    {
+                        non_trump_index = Some(defense_card_index);
+                    },
+                Err(Error::IncorrectDefense) => continue,
+                Err(error) => panic!("{} defense error: {error}", self.name)
+            }
+        }
+        
+        match non_trump_index   
+        {
+            Some(index) => Some((attack_card_index, self.cards.remove(index))),
+            None =>
+                match trump_index
+                {
+                    Some(index) => Some((attack_card_index, self.cards.remove(index))),
+                    None => None
+                }
+        }
     }
 }

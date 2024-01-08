@@ -59,19 +59,50 @@ mod tests {
         assert_eq!(player.play_attack_card(& table), Some(Card::new(Value::Seven, Suit::Club))); // 2
         */
     }
+
+    #[test]
+    fn draw_stock_cards()
+    {
+        let mut game = Game::new(SettingsBuilder::new().build());
+        game.table().reset();
+        let mut bot = Bot::new(BotDificulty::Easy);
+
+        bot.take_cards(&mut game.table().draw_stock_cards(6).unwrap());
+        assert_eq!(bot.cards_count(), 6);
+    }
+
+    #[test]
+    fn draw_played_cards()
+    {
+        let mut game = Game::new(SettingsBuilder::new().build());
+        game.table().reset();
+        let mut bot = Bot::new(BotDificulty::Easy);
+
+        let mut cards = vec![Card::new(Value::Seven, Suit::Heart), Card::new(Value::Seven, Suit::Spade), Card::new(Value::Seven, Suit::Diamond), Card::new(Value::Seven, Suit::Club)];
+        game.table().take_attack_card(cards.remove(0));
+        game.table().take_attack_card(cards.remove(0));
+        game.table().take_attack_card(cards.remove(0));
+        game.table().take_attack_card(cards.remove(0));
+
+        bot.take_cards(&mut game.table().draw_played_cards().unwrap());
+        assert_eq!(bot.cards_count(), 4);
+    }
 }
 
 fn main() {
     let mut game = game::Game::new(game::SettingsBuilder::new().build());
 
-    let bot1 = Box::new(player::Bot::new(player::BotDificulty::Hard));
+    let bot1 = Box::new(player::Bot::new(player::BotDificulty::Easy));
     bot1.show_cards();
     let _ = game.add_player(bot1);
 
-    let bot2 = Box::new(player::Bot::new(player::BotDificulty::Hard));
+    let bot2 = Box::new(player::Bot::new(player::BotDificulty::Medium));
     bot2.show_cards();
     let _ = game.add_player(bot2);
-
+    
+    let bot3 = Box::new(player::Bot::new(player::BotDificulty::Hard));
+    bot3.show_cards();
+    let _ = game.add_player(bot3);
 
     let mut player = Box::new(player::RealPlayer::new("FOO"));
     //let mut cards = vec![Card::new(Value::Seven, Suit::Heart), Card::new(Value::Seven, Suit::Spade), Card::new(Value::Seven, Suit::Diamond), Card::new(Value::Seven, Suit::Club)];

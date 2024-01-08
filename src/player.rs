@@ -22,7 +22,14 @@ pub trait Player
 
     fn take_cards(&mut self, cards: &mut dyn Iterator<Item = cards::Card>)
     {
+        log!(0, "{} take cards: ", (self.name()));
+        let old_cards_count = self.cards_count();
         self.cards_mut().extend(cards);
+        for card_index in old_cards_count .. self.cards_count() 
+        {
+            log!(0, "{}, ", (self.cards()[card_index]));
+        }
+        logln!(0, "\n");
         // self.cards_mut().sort_by(|lhs, rhs| -> std::cmp::Ordering lhs.value().cmp(rhs.value())});
         self.cards_mut().sort();
     }
@@ -253,10 +260,16 @@ impl Player for Bot
 
     fn play_attack_card(&mut self, table: & table::Table, is_first_attack: bool) -> Option<cards::Card>
     {
-        if is_first_attack
+        let lowest_cards_indecies: [usize; 3] = [0; 3]; // trump isn't taken
+        for i in 0 .. self.cards_count()
         {
-            self.cards.remove(rand::thread_rng().gen_range(0 .. self.cards.len()));
-        }
+            match table.check_attack_card(& self.cards[i], is_first_attack)
+            {
+                Ok(()) => return Some(self.cards.remove(i)),
+                Err(Error::AbsentCardValue(_)) => continue,
+                Err(error) => panic!("Bot attack error: {error}"),
+            }
+        };
         None
     }
     
@@ -266,7 +279,7 @@ impl Player for Bot
         let mut trump_index: Option<usize> = None;
         
         let attack_card_index = table.defense_cards().len();
-        for defense_card_index in (0 .. self.cards.len()).rev()
+        for defense_card_index in (0 .. self.cards_count()).rev()
         {
             match table.check_defense_card(& self.cards[defense_card_index], attack_card_index)
             {

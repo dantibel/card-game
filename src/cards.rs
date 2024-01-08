@@ -1,4 +1,5 @@
 pub const CARDS_IN_DECK_COUNT: usize = 6;
+pub const CARDS_IN_DECK_COUNT_SINGNED: isize = 6;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Value

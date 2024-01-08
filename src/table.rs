@@ -1,3 +1,5 @@
+use itertools::chain;
+
 use rand::Rng;
 use rand::seq::SliceRandom;
 
@@ -74,13 +76,23 @@ impl Table
 
     // --- consume player cards ---
 
-    pub fn check_attack_card(& self, attack_card: & cards::Card) -> Result<(), Error>
+    pub fn is_attack_finished(& self) -> bool
     {
-        if self.attack_cards.len() >= cards::CARDS_IN_DECK_COUNT
+        self.attack_cards.len() >= cards::CARDS_IN_DECK_COUNT
+    }
+
+    pub fn check_attack_card(& self, attack_card: & cards::Card, is_first_attack: bool) -> Result<(), Error>
+    {
+        if self.is_attack_finished()
         {
             return Err(Error::TooManyAttackCards);
         }
 
+        if is_first_attack
+        {
+            return Ok(());
+        }
+ 
         for played_card in self.defense_cards.iter().chain(self.attack_cards.iter())
         {
             if attack_card.value() == played_card.value()
@@ -88,7 +100,8 @@ impl Table
                 return Ok(());
             }
         }
-        Err(Error::AbsentCardValue(attack_card.value()))
+
+       Err(Error::AbsentCardValue(attack_card.value()))
     }
 
     pub fn take_attack_card(&mut self, attack_card: cards::Card)
@@ -152,39 +165,24 @@ impl Table
         self.discarded_cards.append(&mut self.defense_cards);
     }
 
-    fn draw_cards_from_back(source: &mut Vec<cards::Card>, count: usize) -> Option<impl Iterator<Item = cards::Card> + '_>
+    pub fn draw_stock_cards(&mut self, count: usize) -> Option<impl Iterator<Item = cards::Card> + '_>
     {
-        if source.is_empty()
+        if self.card_stock.is_empty()
         {
             return None;
         }
-        Some(source.drain((std::cmp::max(0, source.len() - count)) .. source.len()))
+        Some(self.card_stock.drain((self.card_stock.len() - count) ..))
     }
 
-    pub fn draw_stock_cards(&mut self, count: usize) -> Option<impl Iterator<Item = cards::Card> + '_>
+    pub fn draw_played_cards(&mut self) -> impl Iterator<Item = cards::Card> + '_
     {
-        Self::draw_cards_from_back(&mut self.card_stock, count)
-    }
-
-    pub fn draw_played_cards(&mut self) -> Option<impl Iterator<Item = cards::Card> + '_>
-    {
-        let count = self.attack_cards.len();
-        let attack_cards = Self::draw_cards_from_back(&mut self.attack_cards, count);
-        let count = self.defense_cards.len();
-        let defense_cards = Self::draw_cards_from_back(&mut self.defense_cards, count);
-        
-        if attack_cards.is_some() && defense_cards.is_some()
+        if self.attack_cards.len() == 0
         {
-            unsafe
-            {
-                let a = attack_cards.unwrap_unchecked().chain(defense_cards.unwrap_unchecked().into_iter());
-                Some(a)
-            }
+            panic!("There isn't any attack card to draw");
         }
-        else
-        {
-            None
-        }
+        let attack_cards = self.attack_cards.drain(..);
+        let defense_cards = self.defense_cards.drain(..);
+        attack_cards.chain(defense_cards).into_iter()
     }
 }
 
@@ -195,60 +193,53 @@ impl std::fmt::Display for Table
         writeln!(f, "Cards remain: {}, trump: {}", self.remain_cards_count(), self.trump())?;
         for _ in 0 .. self.attack_cards.len()
         {
-            write!(f, "┌────┐")?;
+            write!(f, " ┌────┐ ")?;
         }
         writeln!(f);
 
         for card in self.attack_cards.iter()
         {
-            write!(f, "│{card} │")?;
+            write!(f, " │{card} │ ")?;
+        }
+        writeln!(f);
+              for _ in 0 .. self.defense_cards.len()
+        {
+            write!(f, " │┌───┴┐")?;
+        }
+ 
+        for _ in self.defense_cards.len() .. self.attack_cards.len()
+        {
+            write!(f, " │    │ ")?;
+        }
+        writeln!(f);
+         
+        for card in self.defense_cards.iter()
+        {
+            write!(f, " └┤{card} │")?;
+        }
+        
+        for _ in self.defense_cards.len() .. self.attack_cards.len()
+        {
+            write!(f, " └────┘ ")?;
+        }
+        writeln!(f); 
+
+ 
+        for _ in 0 .. self.defense_cards.len()
+        {
+            write!(f, "  │    │")?;
+        }
+        writeln!(f);
+        
+        for _ in 0 .. self.defense_cards.len()
+        {
+            write!(f, "  └────┘")?;
         }
         writeln!(f);
 
-        if self.attack_cards.len() > self.defense_cards.len()
-        {
-            for _ in 0 .. self.attack_cards.len()
-            {
-                write!(f, "│    │")?;
-            }
-            writeln!(f); 
-
-            for _ in 0 .. self.attack_cards.len()
-            {
-                write!(f, "└────┘")?;
-            }
-            writeln!(f); 
-        }
-        else
-        {
-            for _ in 0 .. self.defense_cards.len()
-            {
-                write!(f, "│┌───┴┐")?;
-            }
-            writeln!(f); 
-            
-            for card in self.defense_cards.iter()
-            {
-                write!(f, "└┤{card} │")?;
-            }
-            writeln!(f);
-
-            for _ in 0 .. self.defense_cards.len()
-            {
-                write!(f, " │    │")?;
-            }
-            writeln!(f);
-            
-            for _ in 0 .. self.defense_cards.len()
-            {
-                write!(f, " └────┘")?;
-            }
-            writeln!(f);
-        }
-
         for i in 0..cards::CARDS_IN_DECK_COUNT
         {
-            write!(f, "  {:>2}  ", i);
+            write!(f, "   {:>2}   ", i);
         }
         writeln!(f, "\n")
     }

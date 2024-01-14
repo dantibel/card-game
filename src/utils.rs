@@ -118,3 +118,12 @@ pub fn get_input(indent_level: usize, message: & str) -> Input
         }
     }
 }
+
+pub fn positive_sub_or_zero<T: num::traits::PrimInt + num::traits::Unsigned>(lhs: T, rhs: T) -> T
+{
+    if lhs <= rhs
+    {
+        return T::zero();
+    }
+    lhs - rhs
+}

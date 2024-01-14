@@ -4,7 +4,7 @@ use rand::Rng;
 use rand::seq::SliceRandom;
 
 use crate::cards;
-use crate::utils::Error;
+use crate::utils::*;
 
 pub struct Table
 {
@@ -167,11 +167,13 @@ impl Table
 
     pub fn draw_stock_cards(&mut self, count: usize) -> Option<impl Iterator<Item = cards::Card> + '_>
     {
-        if self.card_stock.is_empty()
+        if count == 0 || self.card_stock.is_empty()
         {
             return None;
         }
-        Some(self.card_stock.drain((self.card_stock.len() - count) ..))
+        let range = positive_sub_or_zero(self.card_stock.len(), count)..;
+        assert!(range.start <= self.card_stock.len(), "usize substraction underflow (count: {count})");
+        Some(self.card_stock.drain(range))
     }
 
     pub fn draw_played_cards(&mut self) -> impl Iterator<Item = cards::Card> + '_

@@ -8,7 +8,7 @@ mod table;
 mod game;
 
 use crate::cards::{Card, Deck, Value, Suit, CARDS_IN_DECK_COUNT, output_cards};
-use crate::utils::{Error, get_input, Input, log};
+use crate::utils::*;
 use crate::player::{BotDificulty, Bot, RealPlayer, Player};
 use crate::game::{Game, SettingsBuilder};
 use crate::table::Table;
@@ -84,7 +84,7 @@ mod tests {
         game.table().take_attack_card(cards.remove(0));
         game.table().take_attack_card(cards.remove(0));
 
-        bot.take_cards(&mut game.table().draw_played_cards().unwrap());
+        bot.take_cards(&mut game.table().draw_played_cards());
         assert_eq!(bot.cards_count(), 4);
     }
 }

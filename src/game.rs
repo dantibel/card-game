@@ -1,7 +1,7 @@
 use rand::Rng;
 
 use crate::table::Table;
-use crate::utils::{Error, log, logln};
+use crate::utils::*;
 use crate::{cards, player};
 use crate::player::Player;
 
@@ -208,10 +208,7 @@ impl Game
     fn process_player_defense(&mut self, player_index: usize) -> bool
     {
         let player = self.players[player_index].as_mut();
-        if player.cards_count() == 0
-        {
-            return false;
-        }
+        assert!(player.has_cards());
         
         match player.play_defense_card(& self.table)
         {
@@ -250,7 +247,7 @@ impl Game
         {
             is_defense_succeed = false;
         }
-        else
+        else if self.players[defending_player_index].has_cards()
         {
 
             // attacking player continues the attack
@@ -295,12 +292,27 @@ impl Game
                 logln!(0, "{}", (self.table));
                 
                 if self.process_player_attack(attacking_player_index, false)
-                {
+                {   
+                    if !self.players[attacking_player_index].has_cards()
+                    {
+                        self.winners_count += 1;
+                        logln!(0, "{} won! ({} winners in total)\n", (self.players[attacking_player_index].name()), (self.winners_count));       
+                    }
+
                     logln!(0, "{}", (self.table));
 
-                    if !self.process_player_defense(defending_player_index)
+                    if !self.process_player_defense(defending_player_index) 
                     {
-                        is_defense_succeed = self.players[defending_player_index].cards_count() == 0;
+                        // player hasn't beaten attacking card
+                        is_defense_succeed = false;
+                        break;
+                    }
+                    else if !self.players[defending_player_index].has_cards()
+                    {
+                        // player has beaten attacking card with his/her last card
+                        is_defense_succeed = true;
+                        logln!(0, "{} won! ({} winners in total)\n", (self.players[defending_player_index].name()), (self.winners_count));
+                        self.winners_count += 1;
                         break;
                     }
                 }
@@ -357,22 +369,24 @@ impl Game
             logln!(0, "{} didn't beat attack\n", (self.players[defending_player_index].name()));
         }
 
-        // attacking player draw cards
-        let mut player = self.players[self.first_attacking_player_index].as_mut();
-        player.take_cards(&mut self.table.draw_stock_cards((cards::CARDS_IN_DECK_COUNT_SINGNED - player.cards_count() as isize).max(0) as usize));
-
         logln!(0, "{}", (self.table));
         
-        if self.players_count() > 2
+        // attacing players draw cards
+        let mut next_index: usize;
+        let mut player: &mut dyn Player;
+        for i in 0 .. self.players_count()
         {
-            // other players draw cards
-            let mut next_index: usize;
-            let mut player: &mut dyn Player;
-            for i in 1 ..= self.players_count()
+            next_index = (self.first_attacking_player_index + i) % self.players_count();
+            if next_index == defending_player_index
             {
-                next_index = (defending_player_index + i) % self.players_count();
-                player = self.players[next_index].as_mut();
-                player.take_cards(&mut self.table.draw_stock_cards(cards::CARDS_IN_DECK_COUNT - player.cards_count()))
+                continue;
+            }
+
+            player = self.players[next_index].as_mut();
+            if let Some(mut cards) =
+                self.table.draw_stock_cards(player.missing_cards_count())
+            {
+                player.take_cards(&mut cards);
             }
         }
 
@@ -381,15 +395,22 @@ impl Game
         if is_defense_succeed
         {
             self.table.discard_cards();
-            defending_player.take_cards(&mut self.table.draw_stock_cards(cards::CARDS_IN_DECK_COUNT - defending_player.cards_count()));
+            if let Some(mut cards) = 
+                self.table.draw_stock_cards(defending_player.missing_cards_count())
+            {
+                defending_player.take_cards(&mut cards);
+            }
+
+            // choose next player
+            self.first_attacking_player_index = defending_player_index;
         }
         else 
         {
             defending_player.take_cards(&mut self.table.draw_played_cards());
-        }
 
-        // choose next player
-        self.first_attacking_player_index = defending_player_index;
+            // choose next player
+            self.first_attacking_player_index = (defending_player_index + 1) % self.players_count();
+        }
     }
 
 }

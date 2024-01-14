@@ -1,7 +1,7 @@
 use std::path::PrefixComponent;
 use rand::Rng;
 
-use crate::utils::{Error, get_input, Input, log, logln};
+use crate::utils::*;
 use crate::cards;
 use crate::table;
 
@@ -18,6 +18,18 @@ pub trait Player
     fn cards_count(& self) -> usize
     {
         self.cards().len()
+    }
+    
+    fn has_cards(& self) -> bool
+    {
+        self.cards_count() > 0
+    }
+
+    fn missing_cards_count(& self) -> usize
+    {
+        //(cards::CARDS_IN_DECK_COUNT_SINGNED - self.cards_count() as isize).max(0) as usize
+        positive_sub_or_zero(cards::CARDS_IN_DECK_COUNT, self.cards_count())
+        //cards::CARDS_IN_DECK_COUNT.wrapping_sub(self.cards_count())
     }
 
     fn take_cards(&mut self, cards: &mut dyn Iterator<Item = cards::Card>)
@@ -38,21 +50,6 @@ pub trait Player
     {
         logln!(1, "{}'s cards:", (self.name()));
         cards::output_cards(& self.cards());
-    }
-
-    fn get_card(&mut self, card_index: usize) -> Result<& cards::Card, Error>
-    {
-        if card_index >= self.cards().len()
-        {
-            Err(Error::InvalidDeckIndex(card_index))
-        }
-        else
-        {
-            unsafe
-            {
-                Ok(self.cards_mut().get_unchecked(card_index))
-            }
-        }
     }
 
     // --- playing operations ---

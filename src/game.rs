@@ -5,6 +5,7 @@ use crate::utils::*;
 use crate::{cards, player};
 use crate::player::Player;
 
+
 pub struct SettingsBuilder
 {
     pub card_deck              : cards::Deck,
@@ -23,25 +24,25 @@ impl SettingsBuilder
             finish_after_first_win: true,
         }
     }
-
+    
     pub fn card_deck(mut self, card_deck: cards::Deck) -> Self
     {
         self.card_deck = card_deck;
         self
     }
-
+    
     pub fn cheats_allowed(mut self, cheats_allowed: bool) -> Self
     {
         self.cheats_allowed = cheats_allowed;
         self
     }
-
+    
     pub fn finish_after_first_win(mut self, finish_after_first_win: bool) -> Self
     {
         self.finish_after_first_win = finish_after_first_win;
         self
     }
-
+    
     pub fn build(& self) -> Settings
     {
         Settings
@@ -63,17 +64,35 @@ pub struct Settings
     finish_after_first_win : bool,
 }
 
+#[derive(Default)]
+struct RoundInfo
+{
+    is_defense_succeed: bool,
+    first_attacking_index: usize,
+    attacking_index: usize,
+    last_not_passed_index: usize,
+    defending_index: usize,
+    passes_count: usize,
+}
+
+impl RoundInfo
+{
+}
+
 pub struct Game
 {
     table                        : Table,
     players                      : Vec<Box<dyn Player>>,
     settings                     : Settings,
     winners_count                : usize,
-    first_attacking_player_index : usize 
+    //first_attacking_player_index : usize,
+    round_info: RoundInfo, 
 }
 
 impl Game
 {
+    const MIN_PLAYERS_COUNT: usize = 2;
+    
     pub fn new(settings: Settings) -> Self
     {
         Self
@@ -82,7 +101,8 @@ impl Game
             players                      : vec![],
             settings                     : settings,
             winners_count                : 0,
-            first_attacking_player_index : 0,
+            //first_attacking_player_index : 0,
+            round_info: Default::default(), 
         }
     }
 
@@ -116,14 +136,8 @@ impl Game
         &mut self.table
     }
 
-    pub fn start(&mut self)
+    pub fn prepare(&mut self)
     {
-        if self.players_count() < 2
-        {
-            logln!(0, "There are not enough players in this game to start (need {} more)\n", (2 - self.players_count()));
-            return;
-        }
-
         logln!(0, "Current settings: {} cards, {}, {}\n",
             (self.settings.card_deck as usize),
             (if self.settings.cheats_allowed {"cheats are allowed"} else {"cheats are forbiden"}),
@@ -137,14 +151,22 @@ impl Game
             player.take_cards(&mut self.table.draw_stock_cards(cards::CARDS_IN_DECK_COUNT).unwrap());
             player.show_cards();
         }
-
+    
         logln!(0, "Choosing starting player...\n");
-        //self.attacking_player_index = rand::thread_rng().gen_range(0..self.players_count());
-        self.first_attacking_player_index = 1; 
+        self.round_info.first_attacking_index = rand::thread_rng().gen_range(0..self.players_count());
+    }
 
+    pub fn start(&mut self)
+    {
+        if self.players_count() < Self::MIN_PLAYERS_COUNT
+        {
+            logln!(0, "There are not enough players in this game to start (need {} more)\n", (Self::MIN_PLAYERS_COUNT - self.players_count()));
+            return;
+        }
+
+        self.prepare();
+        
         logln!(0, "Game have started! ══════════════════════\n");
-
-        // play until end
         if self.settings.finish_after_first_win
         {
             while self.winners_count == 0
@@ -162,14 +184,11 @@ impl Game
     }
 
     /// Returns whether player played a card
-    fn process_player_attack(&mut self, player_index: usize, is_first_attack: bool) -> bool
+    fn process_player_attack(&mut self, is_first_attack: bool) -> bool
     {
-        if self.table.is_attack_finished()
-        {
-            return false;
-        }
+        debug_assert!(!self.table.is_attack_finished());
 
-        let player = self.players[player_index].as_mut();
+        let player = self.players[self.round_info.attacking_index].as_mut();
         if player.cards_count() == 0
         {
             return false;
@@ -191,6 +210,12 @@ impl Game
                     {
                         logln!(0, "{} continue attack with the {card}\n", (player.name()));
                         self.table.take_attack_card(card);
+
+                        if !player.has_cards()
+                        {
+                            self.winners_count += 1;
+                            logln!(0, "{} won! ({} winners in total)\n", (player.name()), (self.winners_count));       
+                        }
                         return true;
                     },
                     Err(error) => panic!("{error}"),
@@ -205,10 +230,10 @@ impl Game
     } 
 
     /// Returns whether player played a card
-    fn process_player_defense(&mut self, player_index: usize) -> bool
+    fn process_player_defense(&mut self) -> bool
     {
-        let player = self.players[player_index].as_mut();
-        assert!(player.has_cards());
+        let player = self.players[self.round_info.defending_index].as_mut();
+        debug_assert!(player.has_cards());
         
         match player.play_defense_card(& self.table)
         {
@@ -237,136 +262,72 @@ impl Game
     {
         logln!(0, "New round started! ──────────────────────\n");
         logln!(0, "{}", (self.table));
-        let defending_player_index = (self.first_attacking_player_index + 1) % self.players_count();
+        self.round_info.defending_index = (self.round_info.first_attacking_index + 1) % self.players_count();
+        self.round_info.is_defense_succeed = true;
 
         // attacking player starts the attack
-        assert_eq!(self.process_player_attack(self.first_attacking_player_index, true), true, "First attack error");
+        debug_assert!(self.process_player_attack(true), "First attack error");
 
-        let mut is_defense_succeed = true;
-        if !self.process_player_defense(defending_player_index)
+        if !self.process_player_defense()
         {
-            is_defense_succeed = false;
+            self.round_info.is_defense_succeed = false;
         }
-        else if self.players[defending_player_index].has_cards()
+        else
         {
+            debug_assert!(self.players[self.round_info.defending_index].has_cards());
 
-            // attacking player continues the attack
-            /*
-            let mut is_defense = true;
-            while self.table.attack_cards().len() < cards::CARDS_IN_DECK_COUNT
-            {
-                logln!(0, "{}", (self.table));
-                
-                if is_defense
-                {
-                    if !self.process_player_defense(defendeing_player_index)
-                    {
-                        logln!(0, "{}", (self.table));
-                        
-                        is_defense_succeed = false;
-                        break;
-                }
-            } 
-            else 
-            {
-                if !self.process_player_attack(self.first_attacking_player_index, false)
-                {
-                    logln!(0, "{}", (self.table));
-                    
-                    break;
-                }
-            }
-            is_defense = !is_defense;
-            */
-            
-            let mut passes_count = 0usize;
-            let mut attacking_player_index = self.first_attacking_player_index;
             while !self.table.is_attack_finished()
             {
-                if attacking_player_index == defending_player_index
+                if self.round_info.attacking_index == self.round_info.defending_index
                 {
-                    attacking_player_index = (attacking_player_index + 1) % self.players_count();
+                    self.round_info.attacking_index = (self.round_info.attacking_index + 1) % self.players_count();
                     continue;
                 }
 
                 logln!(0, "{}", (self.table));
                 
-                if self.process_player_attack(attacking_player_index, false)
+                if self.process_player_attack(false)
                 {   
-                    if !self.players[attacking_player_index].has_cards()
-                    {
-                        self.winners_count += 1;
-                        logln!(0, "{} won! ({} winners in total)\n", (self.players[attacking_player_index].name()), (self.winners_count));       
-                    }
-
                     logln!(0, "{}", (self.table));
+                    self.round_info.last_not_passed_index = self.round_info.attacking_index;
+                    self.round_info.passes_count = 0;
 
-                    if !self.process_player_defense(defending_player_index) 
+                    if !self.process_player_defense() 
                     {
                         // player hasn't beaten attacking card
-                        is_defense_succeed = false;
+                        self.round_info.is_defense_succeed = false;
                         break;
                     }
-                    else if !self.players[defending_player_index].has_cards()
+                    else if !self.players[self.round_info.defending_index].has_cards()
                     {
                         // player has beaten attacking card with his/her last card
-                        is_defense_succeed = true;
-                        logln!(0, "{} won! ({} winners in total)\n", (self.players[defending_player_index].name()), (self.winners_count));
+                        self.round_info.is_defense_succeed = true;
+                        logln!(0, "{} won! ({} winners in total)\n", (self.players[self.round_info.defending_index].name()), (self.winners_count));
                         self.winners_count += 1;
                         break;
                     }
                 }
                 else
                 {
-                    passes_count += 1;
-                    if attacking_player_index == self.first_attacking_player_index
-                        && passes_count >= self.players_count() - 1
+                    self.round_info.passes_count += 1;
+                    if self.round_info.attacking_index == self.round_info.last_not_passed_index
+                    && self.round_info.passes_count >= self.players_count() - 1
                     {
                         break;
                     }
                     
-                    attacking_player_index = (attacking_player_index + 1) % self.players_count();
+                    self.round_info.attacking_index = (self.round_info.attacking_index + 1) % self.players_count();
                 }
             }
         }
             
-        /*
-        if self.players_count() > 2
+        if self.round_info.is_defense_succeed
         {
-            // other players continue the round
-            let mut round_is_going = true;
-            let mut player_index = defendeing_player_index;
-            while round_is_going
-            {
-                round_is_going = false;
-                player_index = (player_index + 1) % self.players_count();
-                
-                if player_index != defendeing_player_index
-                {
-                    if self.table.attack_cards().len() < cards::CARDS_IN_DECK_COUNT
-                        && self.process_player_attack(player_index, false)
-                    {
-                        round_is_going = true;
-                    }
-                }
-                else
-                {
-                    if !self.process_player_defense(player_index)
-                    {
-                        is_defense_succeed = false;
-                    }
-                }
-            }
-        }
-        */
-
-        if is_defense_succeed
-        {
-            logln!(0, "{} beat attack\n", (self.players[defending_player_index].name()));
+            logln!(0, "{} beat attack\n", (self.players[self.round_info.defending_index].name()));
         }
         else 
         {
-            logln!(0, "{} didn't beat attack\n", (self.players[defending_player_index].name()));
+            logln!(0, "{} didn't beat attack\n", (self.players[self.round_info.defending_index].name()));
         }
 
         logln!(0, "{}", (self.table));
@@ -376,8 +337,8 @@ impl Game
         let mut player: &mut dyn Player;
         for i in 0 .. self.players_count()
         {
-            next_index = (self.first_attacking_player_index + i) % self.players_count();
-            if next_index == defending_player_index
+            next_index = (self.round_info.first_attacking_index + i) % self.players_count();
+            if next_index == self.round_info.defending_index
             {
                 continue;
             }
@@ -391,8 +352,8 @@ impl Game
         }
 
         // defending player draws cards
-        let defending_player = self.players[defending_player_index].as_mut();
-        if is_defense_succeed
+        let defending_player = self.players[self.round_info.defending_index].as_mut();
+        if self.round_info.is_defense_succeed
         {
             self.table.discard_cards();
             if let Some(mut cards) = 
@@ -402,14 +363,14 @@ impl Game
             }
 
             // choose next player
-            self.first_attacking_player_index = defending_player_index;
+            self.round_info.first_attacking_index = self.round_info.defending_index;
         }
         else 
         {
             defending_player.take_cards(&mut self.table.draw_played_cards());
 
             // choose next player
-            self.first_attacking_player_index = (defending_player_index + 1) % self.players_count();
+            self.round_info.first_attacking_index = (self.round_info.defending_index + 1) % self.players_count();
         }
     }
 

@@ -110,8 +110,8 @@ impl std::fmt::Display for Suit
             {
                 Self::Club => "♣",
                 Self::Spade => "♠",
-                Self::Heart => "♡",
-                Self::Diamond => "♢",
+                Self::Heart => "♥",
+                Self::Diamond => "♦",
             })
     }
 }

@@ -1,4 +1,5 @@
 use std::path::PrefixComponent;
+use std::time::Duration;
 use rand::Rng;
 
 use crate::utils::*;
@@ -48,7 +49,7 @@ pub trait Player
 
     fn show_cards(& self)
     {
-        logln!(1, "{}'s cards:", (self.name()));
+        logln!(0, "{}'s cards:", (self.name()));
         cards::output_cards(& self.cards());
     }
 
@@ -129,6 +130,7 @@ impl Player for RealPlayer
     
     fn play_defense_card(&mut self, table: & table::Table) -> Option<(usize, cards::Card)>
     {
+        self.show_cards();
         let defense_card_index =
             loop
             {
@@ -257,6 +259,8 @@ impl Player for Bot
 
     fn play_attack_card(&mut self, table: & table::Table, is_first_attack: bool) -> Option<cards::Card>
     {
+        std::thread::sleep(Duration::from_millis(500));
+        
         let lowest_cards_indecies: [usize; 3] = [0; 3]; // trump isn't taken
         for i in 0 .. self.cards_count()
         {
@@ -272,6 +276,8 @@ impl Player for Bot
     
     fn play_defense_card(&mut self, table: & table::Table) -> Option<(usize, cards::Card)>
     {
+        std::thread::sleep(Duration::from_millis(500));
+
         let mut non_trump_index: Option<usize> = None;
         let mut trump_index: Option<usize> = None;
         

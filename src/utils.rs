@@ -33,28 +33,28 @@ impl std::error::Error for Error
 {
 }
 
-const INDENT_SIZE: usize = 3;
+pub const INDENT_SIZE: usize = 3;
 
 macro_rules! log
 {
     ($indent:literal, $format:literal) =>
     {
-        print!("{: >1$}", $format, $indent)
+        print!("{2:1$}{0}", $format, $indent * INDENT_SIZE, "")
     };
 
     ($indent:literal, $format:literal, $($arg:tt), +) =>
     {
-        print!("{: >1$}", format!($format, $($arg), +), $indent)
+        print!("{2:1$}{0}", format!($format, $($arg), +), $indent * INDENT_SIZE, "")
     };
 
     ($indent:ident, $format:ident) =>
     {
-        print!("{: >1$}", $format, $indent)
+        print!("{2:1$}{0}", $format, $indent * INDENT_SIZE, "")
     };
 
     ($indent:ident, $format:ident, $($arg:tt), +) =>
     {
-        print!("{: >1$}", format!($format, $($arg), +), $indent)
+        print!("{2:1$}{0}", format!($format, $($arg), +), $indent * INDENT_SIZE, "")
     };
 }
 
@@ -67,22 +67,22 @@ macro_rules! logln
 
     ($indent:literal, $format:literal) =>
     {
-        println!("{: >1$}", $format, $indent)
+        println!("{2:1$}{0}", $format, $indent * INDENT_SIZE, "")
     };
 
     ($indent:literal, $format:literal, $($arg:tt), +) =>
     {
-        println!("{: >1$}", format!($format, $($arg), +), $indent)
+        println!("{2:1$}{0}", format!($format, $($arg), +), $indent * INDENT_SIZE, "")
     };
 
     ($indent:ident, $format:ident) =>
     {
-        println!("{: >1$}", $format, $indent)
+        println!("{2:1$}{0}", $format, $indent * INDENT_SIZE, "")
     };
 
     ($indent:ident, $format:ident, $($arg:tt), +) =>
     {
-        println!("{: >1$}", format!($format, $($arg), +), $indent)
+        println!("{2:1$}{0}", format!($format, $($arg), +), $indent * INDENT_SIZE, "")
     };
 
 }
